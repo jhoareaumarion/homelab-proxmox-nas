@@ -1,0 +1,110 @@
+---
+- name: Create Users/Going for user {{ item.name }}
+  vars:
+    token_per_users: []
+  block:
+    - name: Create Users/Create all node users
+      ansible.builtin.user:
+        name: "{{ item.name }}"
+        state: present
+        groups: sudo
+        shell: /bin/bash
+        password: "{{ item.hashed_password }}"
+        update_password: on_create
+
+    - name: Create Users/Create all .ssh directory
+      ansible.builtin.file:
+        path: "/home/{{ item.name }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+
+    - name: Create Users/Add public keys to authorized_keys
+      ansible.builtin.copy:
+        content: "{{ item.ssh_public_key }}"
+        dest: "/home/{{ item.name }}/.ssh/authorized_keys"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0600'
+
+    - name: Create Users/Add .bashrc
+      ansible.builtin.copy:
+        src: "{{ user_bashrc_relative_path }}"
+        dest: "/home/{{ item.name }}/.bashrc"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0644'
+
+    - name: Create Users/Add .profile
+      ansible.builtin.copy:
+        src: "{{  user_profile_relative_path }}"
+        dest: "/home/{{ item.name }}/.profile"
+        owner: "{{ item.name }}"
+        group: "{{ item.name }}"
+        mode: '0644'
+        
+    - name: Set current user facts 
+      ansible.builtin.set_fact: 
+        currentUser: "{{ item }}"
+
+    - name: Get existing roles
+      ansible.builtin.shell: pveum role list
+      register: roles
+
+    - name: Get existing users
+      ansible.builtin.shell: pveum user list
+      register: proxmox_users
+
+    - name: Check ACL assignments for custom roles
+      ansible.builtin.shell: pveum acl list
+      register: permissions
+
+
+    - name: Ensure custom roles exist if needed
+      command: >
+        pveum role add {{ currentUser.proxmox_settings.role.name }} -privs "{{ currentUser.proxmox_settings.role.privileges }}"
+      when: currentUser.proxmox_settings.hasCustomRole and currentUser.proxmox_settings.role.name not in roles.stdout
+
+    - name: Create user on Proxmox
+      ansible.builtin.shell: >
+        pveum user add {{ currentUser.name }}@{{ currentUser.proxmox_settings.realm }} --password '{{ currentUser.password }}'
+      when: currentUser.name not in proxmox_users.stdout
+      args:
+        executable: /bin/bash
+
+    - name: Ensure custom roles assigned to users if not already assigned
+      command: >
+        pveum aclmod / -user {{ currentUser.name }}@{{ currentUser.proxmox_settings.realm }} -role {{ currentUser.proxmox_settings.role.name }}
+      when: currentUser.proxmox_settings.hasCustomRole and ((permissions.stdout | length == 0) or (permissions.stdout | regex_search('│\\s+' + currentUser.proxmox_settings.role.name + '\\s+│\\s+user\\s+│\\s+' + currentUser.name + '@pve\\s+│') is not defined))
+      no_log: true
+
+    - name: List token for users that requires token
+      command: >
+        pveum user token list {{ currentUser.name }}@{{ currentUser.proxmox_settings.realm }} 
+      when: currentUser.proxmox_settings.hasToken
+      register: tokens_output
+      no_log: true
+
+    - name: Ensure user that requires a token has a token
+      command: >
+        pveum user token add {{ currentUser.name }}@{{ currentUser.proxmox_settings.realm }} {{ currentUser.name }}-token --privsep 0
+      when: currentUser.proxmox_settings.hasToken and (tokens_output.stdout is not defined or tokens_output.stdout | length == 0)
+      register: created_tokens_output
+      no_log: true
+
+    - name: Update token_per_user if necessary
+      when: created_tokens_output.changed
+      block:
+        - name: Extract token-id
+          ansible.builtin.set_fact:
+            token_id: "{{ created_tokens_output.stdout | regex_search('│\\s*full-tokenid\\s*│\\s*([^\\s]+)\\s*│', '\\1') | first | default('') }}"
+          no_log: true
+        - name: Extract token-secret
+          ansible.builtin.set_fact:
+            token_secret: "{{ created_tokens_output.stdout | regex_search('│\\s*value\\s*│\\s*([a-f0-9-]+)\\s*│', '\\1') | first | default('') }}"
+          no_log: true
+
+        - name: Token is
+          ansible.builtin.debug:
+            msg: "{{ token_id }} | {{ token_secret }}"

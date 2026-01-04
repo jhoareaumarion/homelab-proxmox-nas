@@ -2,6 +2,7 @@
 A small repository to bootstrap my PVE install on NAS UGREEN DXP4800
 
 ## Setting up devcontainer using template
+
 ### Requirements
 - **Docker**: Ensure Docker is installed and running on your machine.
 - **Dev Container CLI**: Install the [Dev Container CLI](https://github.com/devcontainers/cli). *(I developed and tested this in a **WSL** environment.)*
@@ -13,5 +14,20 @@ Run this command at this repository's root:
 devcontainer templates apply \
 --workspace-folder . \
 --template-id ghcr.io/jhoareaumarion/devcontainers/ansible-bitwarden-kubernetes-tofu:latest \
---template-args '{ "additionalAnsibleCollections":"netbox.netbox", "additionalPythonPackages":"requests,pytest" }'
+--template-args '{ "additionalAnsibleCollections":"netbox.netbox", "additionalPythonPackages":"passlib,requests,pytest,pytz" }'
+```
+
+
+## Setting up Bitwarden sync
+Secrets depends on a Bitwarden account located on a specific Bitwarden server. Please do
+```bash
+bw config server <SERVER>
+```
+then
+```bash
+bw login
+```
+and
+```bash
+export BW_SESSION="<TOKEN_PROVIDED>"
 ```

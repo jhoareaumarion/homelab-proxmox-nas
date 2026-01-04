@@ -1,0 +1,24 @@
+---
+- name: Install Base Packages/Installing package required (Proxmox)
+  block:
+    - name: Install Base Packages/Ensure ceph.sources is not in source list
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/ceph.sources
+        state: absent
+
+    - name: Install Base Packages/Ensure pve-enterprise.sources is not in source list
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/pve-enterprise.sources
+        state: absent
+
+- name: Install Base Packages/Installing package required
+  block:
+    - name: Install Base Packages/Update and upgrade all apt packages
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install Base Packages/Ensure sudo is installed
+      ansible.builtin.apt:
+        pkg:
+          - sudo
+        state: present

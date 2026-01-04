@@ -1,0 +1,111 @@
+---
+- name: Load vaulted secrets ONCE from Bitwarden lookups
+  hosts: HOME-DESK-R01-JUP01
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Get all Bitwarden records from collection"
+      ansible.builtin.set_fact:
+        bitwarden_lookup: "{{ lookup('community.general.bitwarden') }}"
+        no_log: true
+
+    - name: "Include secrets"
+      ansible.builtin.include_vars:
+        file: "initialize-pve-node-secrets.yml"
+        name: bitwarden_secrets
+      no_log: true
+
+    - name: Cache all Bitwarden lookups as facts
+      ansible.builtin.set_fact:
+        ansible_user: "{{ bitwarden_secrets.ansible_user }}"
+        ansible_password: "{{ bitwarden_secrets.ansible_password }}"
+        root_node_private_key: "{{ bitwarden_secrets.root_node_private_key }}"
+        ansible_node_private_key: "{{ bitwarden_secrets.ansible_node_private_key }}"
+        ansible_node_public_key: "{{ bitwarden_secrets.ansible_node_public_key }}"
+        ansible_node_username: "{{ bitwarden_secrets.ansible_node_username }}"
+        ansible_node_password: "{{ bitwarden_secrets.ansible_node_password }}"
+        personal_user_node_username: "{{ bitwarden_secrets.personal_user_node_username }}"
+        personal_user_node_password: "{{ bitwarden_secrets.personal_user_node_password }}"
+        personal_user_node_public_key: "{{ bitwarden_secrets.personal_user_node_public_key }}"
+        opentofu_user_node_username: "{{ bitwarden_secrets.opentofu_user_node_username }}"
+        opentofu_user_node_password: "{{ bitwarden_secrets.opentofu_user_node_password }}"
+        opentofu_user_node_public_key: "{{ bitwarden_secrets.opentofu_user_node_public_key }}"
+      no_log: true
+      run_once: true
+
+- name: Initialize PVE Node
+  hosts: HOME-DESK-R01-JUP01
+  gather_facts: false
+  vars:
+  tasks:
+    - name: Gettings credentials for PVE Node connection
+      block:
+        - name: Create SSH private key file from Bitwarden
+          ansible.builtin.tempfile:
+            state: file
+            suffix: .key
+          register: ssh_key_file
+        - name: Write private key from Bitwarden to temp file
+          ansible.builtin.copy:
+            content: "{{ root_node_private_key }}"
+            dest: "{{ ssh_key_file.path }}"
+            mode: '0600'
+        - name: Register SSH key file for this host
+          ansible.builtin.set_fact:
+            ssh_key_path: "{{ ssh_key_file.path }}"
+          run_once: true
+
+    - name: Install base packages
+      ansible.builtin.include_role:
+        name: manage-pve-nodes
+        tasks_from: install-base-packages
+
+    - name: Create users
+      ansible.builtin.include_role:
+        name: manage-pve-nodes
+        tasks_from: create-users
+      vars:
+        token_per_users: []
+        users:
+          - name: "{{ personal_user_node_username }}"
+            password: "{{ personal_user_node_password }}"
+            hashed_password: "{{ personal_user_node_password | password_hash('sha512') }}"
+            ssh_public_key: "{{ personal_user_node_public_key }}"
+            proxmox_settings:
+              realm: "pam"
+              hasToken: false
+              hasCustomRole: false
+              role:
+                name: "PVEAdmin"
+              token-id: '{{ personal_user_node_username }}-token'
+          - name: "{{ opentofu_user_node_username }}"
+            password: "{{ opentofu_user_node_password }}"
+            hashed_password: "{{ opentofu_user_node_password | password_hash('sha512') }}"
+            ssh_public_key: "{{ opentofu_user_node_public_key }}"
+            proxmox_settings:
+              realm: "pam"
+              hasToken: true
+              token:
+
+              hasCustomRole: true
+              role:
+                name: "OpenTofuProvider"
+                privileges: >
+                  Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit
+                  Pool.Allocate Sys.Audit Sys.Console Sys.Modify VM.Allocate VM.Audit
+                  VM.Clone VM.Config.CDROM VM.Config.Cloudinit VM.Config.CPU VM.Config.Disk
+                  VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options
+                  VM.Migrate VM.PowerMgmt SDN.Use
+          - name: "{{ ansible_node_username }}"
+            password: "{{ ansible_node_password }}"
+            hashed_password: "{{ ansible_node_password | password_hash('sha512') }}"
+            ssh_public_key: "{{ ansible_node_public_key }}"
+            proxmox_settings:
+              realm: "pam"
+              hasToken: false
+              hasCustomRole: true
+              role:
+                name: "AnsibleProvider"
+                privileges: "Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit Sys.Audit Sys.Modify Sys.Console"
+              token-id: "{{ ansible_node_username }}-token"
+      loop: "{{ users }}"

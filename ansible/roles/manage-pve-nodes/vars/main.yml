@@ -1,0 +1,3 @@
+---
+user_bashrc_relative_path: 'roles/manage-pve-nodes/files/.bashrc'
+user_profile_relative_path: 'roles/manage-pve-nodes/files/.profile'
