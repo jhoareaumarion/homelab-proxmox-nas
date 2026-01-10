@@ -1,1 +1,3 @@
 ansible/hooks/vault-password
+opentofu/HOME-DESK-R01-JUP01/secrets.auto.tfvars
+opentofu/common/bitwarden_provider.tfvars
