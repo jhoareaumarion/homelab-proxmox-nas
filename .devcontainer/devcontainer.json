@@ -5,7 +5,7 @@
     "context": "."
   },  
   "containerEnv": {
-    "PYTHON_PACKAGES": "requests,pytest,pytz",                                              // comma-separated
+    "PYTHON_PACKAGES": "requests,pytest,pytz,proxmoxer",                                              // comma-separated
     "ANSIBLE_COLLECTIONS": "",                             // comma-separated
   },
   "customizations": {
