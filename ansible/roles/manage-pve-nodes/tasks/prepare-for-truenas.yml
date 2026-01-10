@@ -1,0 +1,28 @@
+---
+- name: Determining directory storage expected path
+  ansible.builtin.set_fact:
+    iso_storage_path: "/var/lib/proxmox/{{ config_context[0].iso_storage_name }}"
+
+- name: "Ensure directory storage exists: {{ config_context[0].iso_storage_name }}"
+  community.proxmox.proxmox_storage:
+    api_host: "{{ ansible_node_api_host }}"
+    api_port: "{{ ansible_node_api_port }}"
+    api_user: "{{ ansible_node_api_user }}"
+    api_password: "{{ ansible_node_password }}"
+    nodes: "{{ config_context[0].node_name }}"
+    dir_options:
+      path: "{{ iso_storage_path }}"
+    content:
+      - "images"
+      - "iso"
+      - "vztmpl"
+    state: present
+    name: "{{ config_context[0].iso_storage_name }}"
+    type: "dir"
+  delegate_to: localhost
+
+- name: Download iso {{ truenas_version }}
+  ansible.builtin.get_url:
+    url: "{{ config_context[0].truenas_configuration.iso_url }}"
+    dest: "{{ iso_storage_path }}/template/iso/TrueNAS_{{ config_context[0].truenas_configuration.version }}.iso"
+    mode: '0644'
