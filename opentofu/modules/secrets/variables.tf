@@ -1,23 +1,23 @@
 variable "master_password" {
-  description = "The e-mail of the Bitwarden account"
+  description = "The master password of the Bitwarden account"
   type        = string
   sensitive   = true
 }
 
 variable "server" {
-  description = "The e-mail of the Bitwarden account"
+  description = "The server of the Bitwarden account"
   type        = string
   sensitive   = true
 }
 
 variable "client_secret" {
-  description = "The e-mail of the Bitwarden account"
+  description = "The client secret of the Bitwarden account"
   type        = string
   sensitive   = true
 }
 
 variable "client_id" {
-  description = "The e-mail of the Bitwarden account"
+  description = "The client ID of the Bitwarden account"
   type        = string
   sensitive   = true
 }

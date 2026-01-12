@@ -18,7 +18,7 @@ devcontainer templates apply \
 ```
 
 
-## Setting up Bitwarden sync
+## Setting up Bitwarden sync (only if running Ansible ONLY)
 Secrets depends on a Bitwarden account located on a specific Bitwarden server. Please do
 ```bash
 bw config server <SERVER>
@@ -31,3 +31,17 @@ and
 ```bash
 export BW_SESSION="<TOKEN_PROVIDED>"
 ```
+
+## Installation workflow
+### PVE Installation and first configuration on NAS hardware
+- Use a bootable USB key to install PVE manually on the device
+- From `ansible` directory run `ansible-playbook ./initialize-pve-node.yml`
+
+### (WIP) TrueNAS scale installation
+- Set the postgreSQL backend credential to PG_CONN_STR environment variable `export PG_CONN_STR="<<CONNECTION STRING>>"`
+- Unlock bw and put the BW_SESSION value in the BW_SESSION env var of the resource `null_resource.attach_physical_disk_to_homelab_nas_playbook[0]`
+- From the device folder (e.g. `opentofu/HOME-DESK-R01-JUP01`), run the command `tofu apply -var-file="../common/bitwarden_provider.tfvars"`
+- Log into PVE Web UI and finalize TrueNAS installation
+- From `ansible` directory run `ansible-playbook ./attach-physical-disk-to-home-desk-r01-jup01-tnas-01.yml`
+- Pass SSH keys
+- From `ansible` directory run `ansible-playbook ./initialize-home-desk-r01-jup01-tnas-01.yml`

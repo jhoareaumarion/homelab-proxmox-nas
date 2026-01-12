@@ -11,7 +11,7 @@
 
     - name: "Include secrets"
       ansible.builtin.include_vars:
-        file: "initialize-pve-node-secrets.yml"
+        file: "secrets/initialize-pve-node-secrets.yml"
         name: bitwarden_secrets
       no_log: true
 
@@ -96,7 +96,7 @@
                   Pool.Allocate Sys.Audit Sys.Console Sys.Modify VM.Allocate VM.Audit
                   VM.Clone VM.Config.CDROM VM.Config.Cloudinit VM.Config.CPU VM.Config.Disk
                   VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options
-                  VM.Migrate VM.PowerMgmt SDN.Use
+                  VM.Migrate VM.PowerMgmt VM.GuestAgent.Audit VM.GuestAgent.Unrestricted SDN.Use
           - name: "{{ ansible_node_username }}"
             password: "{{ ansible_node_password }}"
             hashed_password: "{{ ansible_node_password | password_hash('sha512') }}"

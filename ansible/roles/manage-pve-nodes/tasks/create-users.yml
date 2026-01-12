@@ -43,7 +43,7 @@
         owner: "{{ item.name }}"
         group: "{{ item.name }}"
         mode: '0644'
-        
+
     - name: Set current user facts 
       ansible.builtin.set_fact: 
         currentUser: "{{ item }}"
@@ -81,7 +81,7 @@
 
     - name: List token for users that requires token
       command: >
-        pveum user token list {{ currentUser.name }}@{{ currentUser.proxmox_settings.realm }} 
+        pveum user token list {{ currentUser.name }}@{{ currentUser.proxmox_settings.realm }}
       when: currentUser.proxmox_settings.hasToken
       register: tokens_output
       no_log: true

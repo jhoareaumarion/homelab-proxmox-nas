@@ -1,3 +1,5 @@
 terraform {
-  backend "pg" {}
+  backend "pg" {
+    schema_name       =   "homelab-proxmox-nas"
+  }
 }

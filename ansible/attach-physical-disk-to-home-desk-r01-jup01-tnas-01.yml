@@ -1,0 +1,82 @@
+---
+- name: Load vaulted secrets ONCE from Bitwarden lookups
+  hosts: HOME-DESK-R01-JUP01
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "Get all Bitwarden records from collection"
+      ansible.builtin.set_fact:
+        bitwarden_lookup: "{{ lookup('community.general.bitwarden') }}"
+      no_log: true
+
+    - name: "Include secrets"
+      ansible.builtin.include_vars:
+        file: "secrets/attach-physical-disk-to-home-desk-r01-jup01-tnas-01-secrets.yml"
+        name: bitwarden_secrets
+      no_log: true
+
+    - name: Cache all Bitwarden lookups as facts
+      ansible.builtin.set_fact:
+        ansible_user: "{{ bitwarden_secrets.ansible_user }}"
+        ansible_password: "{{ bitwarden_secrets.ansible_password }}"
+        root_node_private_key: "{{ bitwarden_secrets.root_node_private_key }}"
+        ansible_node_private_key: "{{ bitwarden_secrets.ansible_node_private_key }}"
+        ansible_node_public_key: "{{ bitwarden_secrets.ansible_node_public_key }}"
+        ansible_node_username: "{{ bitwarden_secrets.ansible_node_username }}"
+        ansible_node_api_host: "{{ bitwarden_secrets.ansible_node_api_host }}"
+        ansible_node_api_user: "{{ bitwarden_secrets.ansible_node_api_user }}"
+        ansible_node_api_port: "{{ bitwarden_secrets.ansible_node_api_port }}"
+        ansible_node_password: "{{ bitwarden_secrets.ansible_node_password }}"
+        ansible_netbox_user: "{{ bitwarden_secrets.ansible_netbox_user }}"
+        ansible_netbox_token: "{{ bitwarden_secrets.ansible_netbox_token }}"
+        netbox_base_url: "{{ bitwarden_secrets.netbox_base_url }}"
+      no_log: true
+
+- name: Attach physical disk to node
+  hosts: HOME-DESK-R01-JUP01
+  gather_facts: false
+  vars:
+  tasks:
+    - name: Gettings credentials for PVE Node connection
+      block:
+        - name: Create SSH private key file from Bitwarden
+          ansible.builtin.tempfile:
+            state: file
+            suffix: .key
+          register: ssh_key_file
+        - name: Write private key from Bitwarden to temp file
+          ansible.builtin.copy:
+            content: "{{ root_node_private_key }}"
+            dest: "{{ ssh_key_file.path }}"
+            mode: '0600'
+        - name: Register SSH key file for this host
+          ansible.builtin.set_fact:
+            ssh_key_path: "{{ ssh_key_file.path }}"
+
+    - name: Attach physical disks to VM
+      ansible.builtin.include_role:
+        name: manage-pve-nodes
+        tasks_from: attach-physical-disks.yml
+      vars:
+        disk_modules: >
+            {{ (query('netbox.netbox.nb_lookup', 'modules',
+            api_endpoint=netbox_base_url,
+            api_filter='',
+            token=ansible_netbox_token,
+            validate_certs=true)) | selectattr('value.custom_fields.disk_type', 'match', 'sata') }}
+        disk_module_bays: >
+            {{ (query('netbox.netbox.nb_lookup', 'module-bays',
+            api_endpoint=netbox_base_url,
+            api_filter='',
+            token=ansible_netbox_token,
+            validate_certs=true)) | selectattr('value.custom_fields.disk_type', 'match', 'sata') | selectattr('value.installed_module') }}
+        vm_hostname: HOME-DESK-R01-JUP01-50-TNAS-01
+
+    - name: Change HOME-DESK-R01-JUP01-50-TNAS-01 state to Active
+      netbox.netbox.netbox_virtual_machine:
+        netbox_url: "{{ netbox_base_url }}"
+        netbox_token: "{{ ansible_netbox_token }}"
+        data:
+          name: HOME-DESK-R01-JUP01-50-TNAS-01
+          status: active
+      delegate_to: localhost

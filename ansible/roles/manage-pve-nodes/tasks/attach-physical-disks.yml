@@ -1,0 +1,23 @@
+---
+- name: Attach disk to VM
+  command: >
+    qm set {{ hostvars[vm_hostname].custom_fields.proxmox_id }}
+    -scsi{{ item.value.position }}
+    {{
+      disk_modules 
+      | selectattr('key', 'equalto', item.value.installed_module.id) 
+      | map(attribute='value')  
+      | map(attribute='custom_fields.persistent_disk_path') 
+      | first
+    }},serial={{
+      disk_modules 
+      | selectattr('key', 'equalto', item.value.installed_module.id) 
+      | map(attribute='value') 
+      | map(attribute='serial') 
+      | first
+    }}
+
+  loop: "{{ disk_module_bays }}"
+  when: 
+    - item.value.installed_module is defined
+    - item.value.installed_module.id is defined
